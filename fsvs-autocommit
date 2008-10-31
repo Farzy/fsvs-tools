@@ -22,6 +22,15 @@
 # Ce script parcourt tous les référentiels FSVS de la machine et effectue
 # un commit automatique si nécessaire. Il sera typiquement exécuté par
 # "cron" tous les soirs.
+#
+# Un fichier de log est écrit dans /var/log avec toutes les infos sur
+# les opérations exécutées.
+#
+# Le script envoie une ligne à syslog pour signaler si le déroulement s'est
+# passé sans erreur ou pas :
+# - Priorité cron.notice : OK
+# - Priorité cron.error : Une erreur s'est produite
+
 
 #--------------------------------
 # CONFIGURATION
@@ -38,7 +47,22 @@ if [ ! -x /usr/bin/fsvs -o ! -d /etc/fsvs ]; then
 	exit 1
 fi
 
-# Cette commande redirige tout l'affichage vers un fichier de log, en ajout
+# Rotation automatique des logs. Pour éviter de devoir gérer un fichier de
+# configuration permanente pour logrotate, on le génère à la volée.
+LOGROTATE_CONF=$(mktemp)
+cat <<EOS > $LOGROTATE_CONF
+$LOGFILE {
+	rotate 8
+	size 500k
+	missingok
+	compress
+	nomail
+}
+EOS
+logrotate $LOGROTATE_CONF
+rm -f $LOGROTATE_CONF
+
+# Cette commande redirige tout l'affichage vers le fichier de log, en ajout
 # à la fin du fichier.
 exec 1>>$LOGFILE 2>&1
 
