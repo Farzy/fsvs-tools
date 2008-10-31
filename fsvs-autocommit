@@ -114,9 +114,9 @@ echo
 
 # On signale au syslog le déroulement du script
 if [ $RC -eq 0 ]; then
-	logger -p cron.notice -t FSVS "Autocommit OK"
+	logger -p cron.notice -t fsvs "Autocommit OK"
 else
-	logger -p cron.error -t FSVS "Erreur Autocommit. Merci de controler $LOGFILE"
+	logger -p cron.error -t fsvs "Erreur Autocommit. Merci de controler $LOGFILE"
 fi
 
 exit 0
