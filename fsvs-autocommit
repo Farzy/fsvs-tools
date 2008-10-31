@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# fsvs-autocommit : Mise ‡ jour automatique des rÈfÈrentiels FSVS/Subversion
+# fsvs-autocommit : Mise √† jour automatique des r√©f√©rentiels FSVS/Subversion
 #
 # Auteur  : Farzad FARID <ffarid@pragmatic-source.com>
 # Date    : 31/10/2008
@@ -19,17 +19,17 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Ce script parcourt tous les rÈfÈrentiels FSVS de la machine et effectue
-# un commit automatique si nÈcessaire. Il sera typiquement exÈcutÈ par
+# Ce script parcourt tous les r√©f√©rentiels FSVS de la machine et effectue
+# un commit automatique si n√©cessaire. Il sera typiquement ex√©cut√© par
 # "cron" tous les soirs.
 #
-# Un fichier de log est Ècrit dans /var/log avec toutes les infos sur
-# les opÈrations exÈcutÈes.
+# Un fichier de log est √©crit dans /var/log avec toutes les infos sur
+# les op√©rations ex√©cut√©es.
 #
-# Le script envoie une ligne ‡ syslog pour signaler si le dÈroulement s'est
-# passÈ sans erreur ou pas :
-# - PrioritÈ cron.notice : OK
-# - PrioritÈ cron.error : Une erreur s'est produite
+# Le script envoie une ligne √† syslog pour signaler si le d√©roulement s'est
+# pass√© sans erreur ou pas :
+# - Priorit√© cron.notice : OK
+# - Priorit√© cron.error : Une erreur s'est produite
 
 
 #--------------------------------
@@ -41,14 +41,14 @@ LOGFILE=/var/log/fsvs.log
 # Programme principal
 #---------------------------------
 
-# DÈj‡, est-ce qu'il y a FSVS ainsi qu'un rÈpertoire de configuration ?
+# D√©j√†, est-ce qu'il y a FSVS ainsi qu'un r√©pertoire de configuration ?
 if [ ! -x /usr/bin/fsvs -o ! -d /etc/fsvs ]; then
-	echo "Erreur : FSVS n'est pas configurÈ sur ce serveur"
+	echo "Erreur : FSVS n'est pas configur√© sur ce serveur"
 	exit 1
 fi
 
-# Rotation automatique des logs. Pour Èviter de devoir gÈrer un fichier de
-# configuration permanente pour logrotate, on le gÈnËre ‡ la volÈe.
+# Rotation automatique des logs. Pour √©viter de devoir g√©rer un fichier de
+# configuration permanente pour logrotate, on le g√©n√®re √† la vol√©e.
 LOGROTATE_CONF=$(mktemp)
 cat <<EOS > $LOGROTATE_CONF
 $LOGFILE {
@@ -63,56 +63,56 @@ logrotate $LOGROTATE_CONF
 rm -f $LOGROTATE_CONF
 
 # Cette commande redirige tout l'affichage vers le fichier de log, en ajout
-# ‡ la fin du fichier.
+# √† la fin du fichier.
 exec 1>>$LOGFILE 2>&1
 
 echo "-----------------------------------------------------------------------"
-echo "Autocommit FSVS sur $(hostname) le $(date '+%d/%m/%Y ‡ %H:%M')"
+echo "Autocommit FSVS sur $(hostname) le $(date '+%d/%m/%Y √† %H:%M')"
 echo
 
 
-# Liste des rÈpertoires sous contrÙle FSVS (il y a un lien symbolique dans chaque
-# rÈpertoire de configuration)
+# Liste des r√©pertoires sous contr√¥le FSVS (il y a un lien symbolique dans chaque
+# r√©pertoire de configuration)
 DIRS=$(find /etc/fsvs -name _base -print)
-echo ">>>>>> Liste des rÈpertoires sous contrÙle FSVS :"
+echo ">>>>>> Liste des r√©pertoires sous contr√¥le FSVS :"
 echo $DIRS
 
 # On note si une erreur au moins se produit
 RC=0
 
 for DIR in $DIRS; do
-	# On rentre dans le rÈpertoire, en suivant le lien symbolique contenu
+	# On rentre dans le r√©pertoire, en suivant le lien symbolique contenu
 	# dans $DIR
 	DIR=$(readlink $DIR)
 	echo; echo ">>>>> Traitement de $DIR <<<<<"
 	cd $DIR
 
-	# On commence par faire un update, au cas o˘ le rÈfÈrentiel Subversion a ÈtÈ
-	# modifiÈ
+	# On commence par faire un update, au cas o√π le r√©f√©rentiel Subversion a √©t√©
+	# modifi√©
 	echo ">>> FSVS Update..."
 	fsvs update
 	RC=$(($RC || $?))
 
 	# Regarde s'il y a des changements en dehors de la configuration FSVS
-	# elle-mÍme (qu'on est obligÈ d'exclure, car "/etc/fsvs/*/config" est
-	# toujours modifiÈ..
-	# FILES contient la liste des fichiers ‡ committer, en excluant "fsvs"
+	# elle-m√™me (qu'on est oblig√© d'exclure, car "/etc/fsvs/*/config" est
+	# toujours modifi√©..
+	# FILES contient la liste des fichiers √† committer, en excluant "fsvs"
 	# et "."
 	FILES=$(fsvs status -C | awk '$3 !~ /(fsvs|\.$)/ { print $3 }')
 	if [ -n "$FILES" ]; then
-		echo ">>> Fichiers modifiÈs localement :"
+		echo ">>> Fichiers modifi√©s localement :"
 		echo $FILES
 		fsvs commit -m "Autocommit sur $(hostname) le $(date '+%d/%m/%Y %H:%M')" $FILES
 		RC=$(($RC || $?))
 	else
-		echo ">>> Aucun fichier modifiÈ localement, pas de 'commit' ‡ faire."
+		echo ">>> Aucun fichier modifi√© localement, pas de 'commit' √† faire."
 	fi
 done
 
 echo "------------------------------------------------"
 echo
 
-# On signale au syslog le dÈroulement du script
+# On signale au syslog le d√©roulement du script
 if [ $RC -eq 0 ]; then
 	logger -p cron.notice -t fsvs "Autocommit OK"
 else
