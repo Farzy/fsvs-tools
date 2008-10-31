@@ -1,0 +1,99 @@
+#!/bin/bash
+
+# fsvs-autocommit : Mise à jour automatique des référentiels FSVS/Subversion
+#
+# Auteur  : Farzad FARID <ffarid@pragmatic-source.com>
+# Date    : 31/10/2008
+# Version : 1
+#
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Ce script parcourt tous les référentiels FSVS de la machine et effectue
+# un commit automatique si nécessaire. Il sera typiquement exécuté par
+# "cron" tous les soirs.
+
+#--------------------------------
+# CONFIGURATION
+#--------------------------------
+LOGFILE=/var/log/fsvs.log
+
+#---------------------------------
+# Programme principal
+#---------------------------------
+
+# Déjà, est-ce qu'il y a FSVS ainsi qu'un répertoire de configuration ?
+if [ ! -x /usr/bin/fsvs -o ! -d /etc/fsvs ]; then
+	echo "Erreur : FSVS n'est pas configuré sur ce serveur"
+	exit 1
+fi
+
+# Cette commande redirige tout l'affichage vers un fichier de log, en ajout
+# à la fin du fichier.
+exec 1>>$LOGFILE 2>&1
+
+echo "-----------------------------------------------------------------------"
+echo "Autocommit FSVS sur $(hostname) le $(date '+%d/%m/%Y à %H:%M')"
+echo
+
+
+# Liste des répertoires sous contrôle FSVS (il y a un lien symbolique dans chaque
+# répertoire de configuration)
+DIRS=$(find /etc/fsvs -name _base -print)
+echo ">>>>>> Liste des répertoires sous contrôle FSVS :"
+echo $DIRS
+
+# On note si une erreur au moins se produit
+RC=0
+
+for DIR in $DIRS; do
+	# On rentre dans le répertoire, en suivant le lien symbolique contenu
+	# dans $DIR
+	DIR=$(readlink $DIR)
+	echo; echo ">>>>> Traitement de $DIR <<<<<"
+	cd $DIR
+
+	# On commence par faire un update, au cas où le référentiel Subversion a été
+	# modifié
+	echo ">>> FSVS Update..."
+	fsvs update
+	RC=$(($RC || $?))
+
+	# Regarde s'il y a des changements en dehors de la configuration FSVS
+	# elle-même (qu'on est obligé d'exclure, car "/etc/fsvs/*/config" est
+	# toujours modifié..
+	# FILES contient la liste des fichiers à committer, en excluant "fsvs"
+	# et "."
+	FILES=$(fsvs status -C | awk '$3 !~ /(fsvs|\.$)/ { print $3 }')
+	if [ -n "$FILES" ]; then
+		echo ">>> Fichiers modifiés localement :"
+		echo $FILES
+		fsvs commit -m "Autocommit sur $(hostname) le $(date '+%d/%m/%Y %H:%M')" $FILES
+		RC=$(($RC || $?))
+	else
+		echo ">>> Aucun fichier modifié localement, pas de 'commit' à faire."
+	fi
+done
+
+echo "------------------------------------------------"
+echo
+
+# On signale au syslog le déroulement du script
+if [ $RC -eq 0 ]; then
+	logger -p cron.notice -t FSVS "Autocommit OK"
+else
+	logger -p cron.error -t FSVS "Erreur Autocommit. Merci de controler $LOGFILE"
+fi
+
+exit 0
+
