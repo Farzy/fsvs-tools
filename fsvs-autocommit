@@ -75,7 +75,9 @@ echo
 # répertoire de configuration)
 DIRS=$(find /etc/fsvs -name _base -print)
 echo ">>>>>> Liste des répertoires sous contrôle FSVS :"
-echo $DIRS
+for DIR in $DIRS; do
+	echo " -" $(readlink $DIR)
+done
 
 # On note si une erreur au moins se produit
 RC=0
