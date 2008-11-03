@@ -127,6 +127,8 @@ for DIR in $DIRS; do
 	echo " -" $(readlink $DIR)
 done
 
+# Nombre de fichiers modifiés
+FILECOUNT=0
 # On note si une erreur au moins se produit
 RC=0
 
@@ -154,6 +156,7 @@ for DIR in $DIRS; do
 		echo $FILES
 		fsvs commit -m "Autocommit sur $(hostname) le $(date '+%d/%m/%Y %H:%M')" $FILES
 		RC=$(($RC || $?))
+		FILECOUNT=$(($FILECOUNT + $(echo $FILES | wc -w)))
 	else
 		echo ">>> Aucun fichier modifié localement, pas de 'commit' à faire."
 	fi
@@ -164,7 +167,7 @@ echo
 
 # On signale au syslog le déroulement du script
 if [ $RC -eq 0 ]; then
-	logger -p cron.notice -t fsvs "Autocommit OK. $(echo $FILES | wc -w) fichier(s) commite(s)."
+	logger -p cron.notice -t fsvs "Autocommit OK. $FILECOUNT fichier(s) commite(s)."
 else
 	logger -p cron.error -t fsvs "Erreur Autocommit. Merci de controler $LOGFILE"
 fi
