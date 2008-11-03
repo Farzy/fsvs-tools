@@ -38,13 +38,61 @@
 LOGFILE=/var/log/fsvs.log
 
 #---------------------------------
+# Fonctions
+#---------------------------------
+usage() {
+	cat <<-EOS 1>&2
+Usage: $0 [options]
+
+Options :
+    -d : Attend un temps aléatoire avant d'exécuter les actions
+    -h : Affiche cette aide en ligne
+
+ Ce script lance les actions "update" et "commit" de FSVS automatiquement
+ pour tous les répertoires sous contrôle FSVS de la machine. Il est destiné
+ à être exécuté automaquement via "cron".
+
+ Il est conseillé d'utiliser l'option "-d" en cas de lancement automatique
+ de ce script sur un grand nombre de serveurs à la même heure.
+EOS
+}
+
+#---------------------------------
 # Programme principal
 #---------------------------------
 
 # Déjà, est-ce qu'il y a FSVS ainsi qu'un répertoire de configuration ?
 if [ ! -x /usr/bin/fsvs -o ! -d /etc/fsvs ]; then
 	echo "Erreur : FSVS n'est pas configuré sur ce serveur"
+	logger -p cron.error -t fsvs  "Erreur : FSVS n'est pas configuré sur ce serveur"
 	exit 1
+fi
+
+# Paramètres de la ligne de commande
+# -d : pour faire une pause aléatoire avant l'exécution, utile si le
+#      script est lancé par "cron".
+DELAY=0
+while getopts ':dh' OPTION; do
+	case $OPTION in
+	d)
+		DELAY=1
+		;;
+	h)
+		usage
+		exit 0
+		;;
+	?)
+		echo "Erreur: Option '$OPTARG' invalide"
+		logger -p cron.error -t fsvs "Erreur: Option '$OPTARG' invalide"
+		usage
+		exit 1
+		;;
+	esac
+done
+
+# Pause ?
+if [ $DELAY -ne 0 ]; then
+	sleep $(($RANDOM / 100)) # Une centaine de secondes maximum
 fi
 
 # Rotation automatique des logs. Pour éviter de devoir gérer un fichier de
