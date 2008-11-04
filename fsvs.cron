@@ -1,0 +1,2 @@
+# Lance un autocommit FSVS dans la nuit
+13 6 * * * root /usr/sbin/fsvs-autocommit -d
