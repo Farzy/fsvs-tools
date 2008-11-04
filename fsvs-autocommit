@@ -36,6 +36,7 @@
 # CONFIGURATION
 #--------------------------------
 LOGFILE=/var/log/fsvs.log
+FSVS_CONFIG=/etc/fsvs/config
 
 #---------------------------------
 # Fonctions
@@ -55,6 +56,25 @@ Options :
  Il est conseillé d'utiliser l'option "-d" en cas de lancement automatique
  de ce script sur un grand nombre de serveurs à la même heure.
 EOS
+}
+
+# Effectue une pré-authentification avec "svn" pour que le cache
+# d'authentification SVN contienne le bon nom d'utilisateur.
+auth() {
+	# Nom et mot de passe sont dans le fichier de configuration
+	# global FSVS
+	FSVS_AUTHOR=$(grep author $FSVS_CONFIG | sed -e 's/^author=//')
+	FSVS_PASSWORD=$(grep -Es "#[[:space:]]password=" $FSVS_CONFIG | sed -e 's/^.*password=//')
+	# Il faut se positionner dans un répertoire versionné par FSVS, peu importe
+	# lequel, avant de lancer la commande "fsvs urls"
+	cd /etc/fsvs/*/_base
+	# Le résultat de cette commande ne nous intéresse pas, l'essentiel
+	# est qu'elle mette à jour /root/.subversion/auth/svn.simple/*
+	svn --username "$FSVS_AUTHOR" --password "$FSVS_PASSWORD" info $(fsvs urls | head --lines=1 | sed -e 's/^.*,.*,//') > /dev/null
+	if [ $? -ne 0 ]; then
+		logger -p cron.error -t fsvs "Erreur d'authentification SVN. Merci de controler $LOGFILE"
+		exit 1
+	fi
 }
 
 #---------------------------------
@@ -94,6 +114,9 @@ done
 if [ $DELAY -ne 0 ]; then
 	sleep $(($RANDOM / 100)) # Une centaine de secondes maximum
 fi
+
+# Pré-authentification SVN
+auth
 
 # Rotation automatique des logs. Pour éviter de devoir gérer un fichier de
 # configuration permanente pour logrotate, on le génère à la volée.
