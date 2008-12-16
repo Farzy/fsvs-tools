@@ -1,0 +1,875 @@
+{{HowTo}}{{Subversion}}
+{{Bouygues}}
+[[Category:HowTo|Subversion]]
+[[Category:Subversion|Installation]]
+[[Category:Bouygues SAS]]
+[[Category:Bouygues EZP]]
+
+__TOC__
+
+== Description ==
+
+[http://fsvs.tigris.org/ FSVS] est un système de gestion de révision avec des fonctionnalités de sauvegarde/restauration, utilisable sur une arborescence disque ou un système de fichiers entier, et qui utilise [http://subversion.tigris.org/ Subversion] comme serveur de stockage.
+
+FSVS est une sorte de ''tar'' ou ''rsync'' avec une gestion de versions intégrée. Le nom signifie  “''Fast System VerSioning''”et se prononce ''fisvis''.
+
+Ce document décrit la configuration et l'utilisateur de FSVS au quotidien.
+
+'''Pour une description de l'architecture FSVS chez Easynet et la procédure d'installation, reportez-vous au document [[FSVS_Installation]].'''
+
+'''Note''' : La connaissance et la compréhension des concepts de base de [http://subversion.tigris.org Subversion] est nécessaire à la bonne utilisation de ce document.
+
+=== Documentation ===
+
+La section '''[[FSVS_Configuration_et_Utilisation#Utilisation_de_FSVS|Utilisation de FSVS]]''' décrit les principales commandes pour une utilisation au jour le jour. Pour une utilisation plus poussée, et pour avoir le détail de chaque commande, merci de lire la documentation officielle :
+
+* Le programme ''fsvs'' est documenté dans une page ''man'' : « <tt>fsvs(1)</tt> »
+* Les options du programme sont documentées dans une page ''man'' : « <tt>fsvs-options(5)</tt> »
+* Les pages principales de la documentation utilisateur sont ici :
+** [http://doc.fsvs-software.org/doxygen-gif/group__userdoc.html Page principale]
+** [http://doc.fsvs-software.org/doxygen-gif/group__cmds.html Paramètres de la ligne de commande]
+** [http://doc.fsvs-software.org/doxygen-gif/group__ignpat.html Format de la liste ''ignore'']
+** [http://doc.fsvs-software.org/doxygen-gif/group__url__format.html Format des URLs]
+** [http://doc.fsvs-software.org/doxygen-gif/group__howto.html Liste des HOWTOs]
+** [http://doc.fsvs-software.org/doxygen-gif/group__howto__master__local.html Utilisation de référentiels multiples]
+* D'autres liens vers la documentation de FSVS sont donnés à la fin de la [[FSVS_Installation#R.C3.A9f.C3.A9rences|documentation d'installation]].
+
+== Arborescence du référentiel FSVS/Subversion ==
+
+La configuration utilisée est inspirée des exemples donnés sur le site web de FSVS : http://doc.fsvs-software.org/doxygen-gif/group__howto__master__local.html
+
+L'arborescence du référentiel Bouygues Telecom / CMSINT est la suivante :
+
+ test/
+ system/
+ system/prod/
+ system/prod/back/
+ system/prod/back/trunk/
+ system/prod/machines/
+ system/prod/machines/ezpstatlog/
+ system/prod/machines/ezpstatlog/trunk/
+ system/prod/machines/ezpstatlog/trunk/etc/
+ system/prod/front/
+ system/prod/front/trunk/
+ system/preprod/
+ system/preprod/back/
+ system/preprod/back/trunk/
+ system/preprod/back/trunk/etc/
+ system/preprod/mysql-cl/
+ system/preprod/mysql-cl/trunk/
+ system/preprod/mysql-cl/trunk/etc/
+ system/preprod/mysql-co/
+ system/preprod/mysql-co/trunk/
+ system/preprod/mysql-co/trunk/etc/
+ system/preprod/machines/
+ system/preprod/machines/frontezp-pp1/
+ system/preprod/machines/frontezp-pp1/trunk/
+ system/preprod/machines/frontezp-pp1/trunk/etc/
+ system/preprod/machines/frontezp-pp2/
+ system/preprod/machines/frontezp-pp2/trunk/
+ system/preprod/machines/frontezp-pp2/trunk/etc/
+ system/preprod/machines/frontezp-pp2/trunk/etc/fsvs/
+ system/preprod/machines/backezp-pp1/
+ system/preprod/machines/backezp-pp1/trunk/
+ system/preprod/machines/backezp-pp1/trunk/etc/
+ system/preprod/machines/backezp-pp2/
+ system/preprod/machines/backezp-pp2/trunk/
+ system/preprod/machines/backezp-pp2/trunk/etc/
+ system/preprod/front/
+ system/preprod/front/trunk/
+ system/preprod/front/trunk/etc/
+ cmsint/
+ cmsint/prod/
+ cmsint/prod/back/
+ cmsint/prod/back/trunk/
+ cmsint/prod/back/trunk/ezpublish/
+ cmsint/prod/front/
+ cmsint/prod/front/trunk/
+ cmsint/prod/front/trunk/ezpublish/
+ cmsint/preprod/
+ cmsint/preprod/back/
+ cmsint/preprod/back/trunk/
+ cmsint/preprod/back/trunk/ezpublish/
+ cmsint/preprod/front/
+ cmsint/preprod/front/trunk/
+ cmsint/preprod/front/trunk/ezpublish/
+
+=== Description détaillée de l'arborescence ===
+
+==== Branches principales ====
+
+A la racine, il y a 3 branches principales :
+
+; test : Sert uniquement aux tests
+; system : Cette branche contient les répertoires système sous contrôle FSVS, par exemple « <tt>/etc</tt> »
+; cmsint : Cette branche contient l'applicatif EzPublish / CMSINT
+
+==== Branches Prod et Preprod ====
+
+Ensuite il y a 2 branches distinguant les serveurs de Production de ceux que Préproduction :
+
+; prod : Production
+; preprod : Préproduction
+
+==== Branches «génériques » pour les cluster serveurs ====
+
+Pour les serveurs en « cluster », il y a une seule branche commune, car normalement ''le contenu du répertoire est identique entre tous les serveurs''.
+
+; back : Contenu des serveurs de Backoffice
+; front : Contenu des serveurs de Frontoffice
+
+==== Branches machines ====
+
+Il y a, à côté des branches génériques, des branches nominatives pour :
+* toutes les machines qui sont uniques (par exemple EzpStatLog)
+* les contenus uniques de serveurs en cluster (par exemple le répertoire « <tt>/etc/sysconfig/networking</tt> » des serveurs FO de Preprod est '''unique''' à chaque serveur, car il contient l'adresse IP, le nom de la machine, etc. Alors que « <tt>/etc</tt> » est quant à lui mutualisé en quasi-totalité dans la branche générique.
+
+=== Configuration initiale du référentiel ===
+
+Pour créer l'arborescence sur le serveur Subversion, il faut utiliser <tt>SVN</tt> localement.
+
+Pour créer les multiples arborescences, le plus simple est de faire un « ''checkout'' » dans un répertoire temporaire de tout le référentiel Subversion (ou d'une branche), puis de créer les répertoires avec « <tt>svn mkdir</tt> ». Ensuite on fait un seul « ''commit'' » global.
+
+==== Exemple 1 ====
+
+<pre>
+export EDITOR=vim
+export SVN=svn://10.10.2.44/
+mkdir /tmp/fsvs-farzad
+cd /tmp/fsvs-farzad
+svn checkout $SVN/cmsint
+cd cmsint
+mkdir -p prod/front/trunk/ezpublish
+mkdir -p prod/back/trunk/ezpublish
+mkdir -p preprod/back/trunk/ezpublish
+mkdir -p preprod/front/trunk/ezpublish
+svn add prod preprod
+svn commit --username=farzad.farid -m "Creation de l'arborescence /cmsint"
+cd ~
+rm -rf /tmp/fsvs-farzad
+</pre>
+
+==== Exemple 2 ====
+
+Ici, nous créons les arborescences « <tt>/etc</tt> » pour tous les serveurs CMSINT de production, en Production.
+
+<pre>
+export EDITOR=vim
+export SVN=svn://10.10.2.44/
+
+mkdir /tmp/fsvs-farzad
+cd /tmp/fsvs-farzad
+svn checkout $SVN/system/prod
+cd prod
+for m in frontezp-p1 frontezp-p2 frontezp-p3 frontezp-p4 backezp-p1 backezp-p2 \
+    mysqlezpp-co1 mysqlezpp-co2 mysqlezpp-col1 mysqlezpp-col2 mysqlezpp-col3 \
+    mysqlezpp-cl1 mysqlezpp-cl2 ezpstatlog ; do 
+  mkdir -p -v machines/$m/trunk/etc
+  svn add machines/$m
+done
+svn commit --username=farzad.farid -m "Création de l'arborescence '/system/prod/machines/*/trunk/etc' de Production"
+cd ~
+rm -rf /tmp/fsvs-farzad
+</pre>
+
+== Configuration de FSVS sur un serveur ==
+
+=== Installation des paquets ===
+
+Pour la plate-forme CMSINT de Bouygues Telecom, le paquet <tt>fsvs</tt> est disponible dans le référentiel ''yum'' « RHEL4 U5 custome ».
+
+Après s'être assuré que « <tt>/etc/yum.conf</tt> » contient les lignes :
+ [custom]
+ name=repository custom Easynet
+ baseurl=http://10.10.0.4:10002/RHEL4/U5/custom
+
+Lancer la commande :
+ yum install subversion fsvs
+
+=== Affichage d'un message d'avertissement pour les admins ===
+
+Modifier le fichier « <tt>/etc/motd</tt> » pour y ajouter les lignes suivantes :
+
+ ----------------------------------------------------------------------------- 
+ ATTENTION : Les repertoires suivants sont sous le controle du 
+ systeme de gestion de configuration FSVS : 
+ /etc 
+ 
+ Si vous faites des changements sur ces repertoires, pensez a commiter les 
+ changements dans le referentiel avec la commande : 
+ fsvs commit -m "Explications..." fichier [fichier..] 
+ Tapez "man fsvs" pour une aide en ligne ou consultez la doc FSVS sur le Wiki 
+ -----------------------------------------------------------------------------
+
+=== Paramétrage de FSVS ===
+
+==== Configuration initiale de FSVS ====
+
+'''Cette étape n'est à faire qu'une seule fois par serveur, même s'il y a plusieurs répertoires versionnés dessus'''.
+
+Maintenant il faut créer le fichier de configuration de FSVS, dans « <tt>/etc/fsvs/config</tt> » :
+
+ # Configuration par défaut de FSVS
+ author=easynet
+ # Le champ "password" doit rester en commentaire, il est officieux
+ # password=XXXXXX
+ commit_to=local
+ empty_commit=no
+ stat_color=yes
+ # "fsvs status" doit ignorer les différences de date
+ filter=none,text,new,deleted,group,owner
+ config_dir=/root/.subversion
+
+{{:Bouygues/Modèle Cadre |
+titre = [[Image:Nuvola_apps_khelpcenter.png|none|22px|Attention]] Pensez à mettre le bon mot de passe ! |
+couleur = #FF8000 |
+couleurTitre = #FF0000 |
+contenu = 
+Le pseudo-champ ''password'' en commentaire est très important. Renseignez le correctement.
+}}
+
+
+Puis il faut protéger ce fichier en lecture, et créer un lien symbolique qui est un palliatif pour ''config_dir'' qui ne marche pas dans certaines version de FSVS :
+
+ chmod 700 /etc/fsvs/config
+ cd /etc/fsvs
+ ln -s /root/.subversion auth
+
+Le fichier de configuration est bien décrit dans la documentation (man pages), en voici une brève explication.
+
+; author : Compte Subversion utilisé pour les ''commits'' automatique (voir [[FSVS_Installation]])
+; password : Mot de passe du compte Subversion. Il est en commentaire car ce n'est pas une option FSVS officielle, mais il est utilisé par le script d'auto-commit, « <tt>/usr/sbin/fsvs-autocommit</tt> ».
+; commit_to : Référentiel par défaut à utiliser en cas de multi-référentiels. '''Attention''' : Ne pas oublier de mettre cette valeur à '''base''' dans le cas où le référentiel est commun à plusieurs machines.
+; empty_commit : Interdit les ''commits'' vides.
+; stat_color : Ajoute des couleurs à l'affichage de résultats.
+; filter : Ne tient pas compte des différences de date des fichiers entre le serveur et le référentiel. Ceci permet de réduire le risque de ''faux positif'' lorsqu'on regarde si le référentiel est à jour.
+; config_dir : Chemin du répertoire de configuration du client SVN, indispensable pour l'authentification.
+
+==== Versionning d'un nouveau répertoire ====
+
+Dans cet exemple, nous allons créer un référentiel pour le répertoire  « <tt>/etc</tt> » du serveur '''backezp-p1'''.
+
+Il faut d'abord instancier le référentiel. Dans une étape précédent, nous avons déjà créé le répertoire Subversion qui correspond à cette machine de production, pour son "/etc" : '''svn://10.10.2.44/system/prod/machines/backezp-p1/trunk/etc'''. Nous avons aussi besoin d'un compte Subversion, reportez-vous au document [[FSVS_Installation]] pour la création des comptes Subversion pour les administrateurs.
+
+Vérifions d'abord que nous voyons le référentiel FSVS/Subversion :
+
+ [root@backezp-p1 ~]# svn ls --username=farzad.farid -v svn://10.10.2.44/system/prod/machines/backezp-p1/trunk/etc
+ Authentication realm: <svn://10.10.2.44:3690> Referentiel de configuration Bouygues Telecom
+ Password for 'farzad.farid':
+ [root@backezp-p1 ~]#
+
+Le référentiel étant vide, rien ne s'affiche, mais il n'y a pas non plus d'erreur.
+
+'''En cas d'erreur, il faut peut-être remplacer "10.10.2.44" par "10.10.3.24".'''
+
+==== Paramètres d'un référentiel ====
+
+Maintenant, nous déclarons le référentiel que nous associons à "/etc". Chaque référentiel a 3 caractéristiques :
+
+; Une URL : Ici c'est <tt>svn://10.10.2.44/system/prod/machines/backezp-p1/trunk/etc</tt>
+; Un nom : Nous utilisons « '''base''' » et « '''local''' »
+; Une priorité : c'est un nombre. Plus il est petit, plus le référentiel a une priorité importante.
+
+==== Cas d'utilisation des référentiels multiples ====
+
+Le nom et la priorité sont utilisés quand nous associons ''plusieurs référentiels'' à un même répertoire. La configuration multi-référentiels est utile quand nous avons un groupe de machines quasi identiques, dont le répertoire à versionner partage la quasi totalité des fichiers, sauf quelques uns qui sont spécifiques à chaque machine. Dans ce cas nous créons '''deux''' référentiels :
+
+* Un référentiel '''local''' de priorité '''100''' : Il contient tous les fichiers locaux à la machine
+* Un référentiel '''base''' de priorité '''200''' : Il contient tous les fichiers communs au groupe de machines
+
+==== Initialisation du référentiel ====
+
+Maintenant, lançons la commande qui associe le référentiel au répertoire « <tt>/etc</tt> » :
+
+'''1) Cas du référentiel uniquement local'''
+
+ cd /etc
+ fsvs urls name:local,prio:100,svn://10.10.2.44/system/prod/machines/backezp-p1/trunk/etc
+
+
+'''2) Cas du référentiel unique, mais commun à plusieurs serveurs'''
+
+ cd /app/ezpublish
+ fsvs urls name:base,prio:200,svn://10.10.2.44/cmsint/prod/back/trunk/ezpublish
+
+
+'''3) Cas d'utilisation de plusieurs référentiels'''
+
+<pre>
+cd /etc
+fsvs urls N:base,P:200,svn://10.10.3.24/system/preprod/front/trunk/etc
+fsvs urls name:local,prio:100,svn://10.10.3.24/system/preprod/machines/frontezp-pp1/trunk/etc
+</pre>
+
+'''Note''' : Mettez à jour « <tt>/etc/motd</tt> » pour qu'il soit en conformité avec la liste
+des répertoires effectivement versionnés.
+
+=== Paramétrage des fichiers/répertoires à ignorer ===
+
+Avant de faire un premier ''commit'', il faut d'abord définir la liste des fichiers et répertoires qu'il faudra toujours ignorer. Il s'agira par exemple de :
+* fichiers temporaires (*~, *.swp, *.old, etc.)
+* fichiers confidentiels
+* fichiers générés automatiquement par le système (/etc/mtab)
+* fichiers ou répertoires liés à NFS (.snapshot, .nfs*)
+
+Pour la syntaxe de l'''ignore list'', veuillez consulter le document '''/usr/share/doc/fsvs-x.y.z/IGNORING'''.
+
+Il faut d'abord lister l'ensemble des éléments que FSVS voit, et souhaite committer :
+
+ fsvs status | less
+
+L'affichage ressemble à ceci :
+
+<pre>
+N...       dir  acpi
+N...       dir  acpi/actions
+N...        90  acpi/events/sample.conf
+N...       dir  acpi/events
+N...        48  adjtime
+N...      1574  aliases
+N...     12288  aliases.db
+[...]
+N...       dir  yum
+N...        19  yum/yum-daily.yum
+N...       671  yum.conf
+N...       dir  yum.repos.d
+.mC.       dir  .
+</pre>
+
+En regardant cette liste, il faut maintenant repérer les éléments à exclure.
+
+==== Exclusions standard pour « /etc/ » ====
+
+Pour les répertoires « <tt>/etc</tt> » des serveurs RHEL4 de CMSINT, la liste suivante convient :
+
+* ./.pwd.lock
+* ./mtab
+* './**~'
+* DEVICE:0
+* './**.swp'
+* ./prelink.cache
+* ./ld.so.cache
+* './**.rpmsave'
+* './**.rpmnew'
+* ./passwd-
+* ./shadow-
+* ./group-
+* ./gshadow-
+* "./**.orig"
+* "./**.old"
+* "./**.bak"
+* "./**.OLD"
+* "./**.tar.gz"
+* "./**.rpm"
+
+==== Exclusions standard pour « /app/ezpublish » ====
+
+Pour le répertoire « <tt>/app/ezpublish</tt> », la liste suivante convient :
+
+* './**~'
+* './**.swp'
+* './**.rpmsave'
+* './**.rpmnew'
+* "./**.orig"
+* "./**.old"
+* "./**.bak"
+* "./**.OLD"
+* "./**.diff"
+* "./**.patch"
+* "./**.tar.gz"
+* "./save/**"
+* "./extension/.snapshot"
+* "./settings/.snapshot"
+* "./var/**"
+* "./**.nfs*"
+* "./**.rpm"
+
+<br />
+
+{{:Bouygues/Modèle Cadre |
+titre = [[Image:Nuvola_apps_khelpcenter.png|none|22px|Attention]] Attention au points suivant lors de l'utilisation de la commande ''ignore'' |
+couleur = #FF8000 |
+couleurTitre = #FF0000 |
+contenu = 
+* Il est possible qu'un serveur particulier, ou groupe de serveurs, nécessite une liste légèrement différente d'exclusions.
+* Il faut encadrer de guillemets ou d'apostrophes les exclusions contenant des caractères ''joker''.
+* <tt>DEVICE:0</tt> permet d'ignorer tous les fichiers spéciaux (''pipe'', ''socket''..) mais aussi '''les points de montage NFS'''.
+}}
+
+==== Commande "fsvs ignore" à exécuter ====
+
+Maintenant, il faut exécuter la commande « <tt>fsvs ignore</tt> » avec les bons paramètres, depuis le répertoire à versionner (ici « '''<tt>/etc</tt>''' ») :
+
+<pre>
+cd /etc
+fsvs ignore ./.pwd.lock ./mtab './**~' DEVICE:0 './**.swp' ./prelink.cache ./ld.so.cache './**.rpm' './**.rpmsave' './**.rpmnew' ./passwd- ./shadow- ./group- ./gshadow- './**.orig' './**.old' './**.bak' './**.OLD' './**.tar.gz'
+</pre>
+
+On peut ensuite vérifier avec « status » qu'il y a moins de fichiers/répertoires listés. Une fois la liste "''ignore''" bien paramétrées, on peut faire un ''commit''.
+
+Pour le répertoire « '''<tt>/app/ezpublish</tt>''' », il faut utiliser la ligne suivante, ''avec éventuellement des adaptation'' :
+
+<pre>
+cd /app/ezpublish
+fsvs ignore './**~' './**.swp' './**.rpm' './**.rpmsave' './**.rpmnew' './**.orig' './**.old' './**.bak' './**.OLD' './**.diff' './**.patch' './**.tar.gz' './save/**' './extension/.snapshot' './settings/.snapshot' './var/**' './**.nfs*'
+</pre>
+
+=== Commit initial ===
+
+Selon que l'on versionne un répertoire dans un référentiel dédié (i.e. chaque machine/répertoire a son propre référentiel FSVS/SVN) ou dans un référentiel partagé (i.e. plusieurs machines utilisent un référentiel commun pour un même répertoire), les commandes à passer seront différentes.
+
+==== Cas du commit simple : un référentiel dédié à une machine ====
+
+Ce cas s'applique aussi pour la '''première machine a être versionné dans un référentiel partagée'''.
+
+On insère dans la base de données Subversion/FSVS la copie actuelle du répertoire à versionner avec la commande suivante :
+
+<pre>
+cd /etc
+fsvs commit -o author=farzad.farid -m "Premier commit pour backezp-p1:/etc"
+</pre>
+
+Cette commande donnera un résultat similaire au suivant :
+
+<pre>
+Authentication realm: <svn://10.10.2.44:3690> Referentiel de configuration Bouygues Telecom
+Password for 'farzad.farid':
+Committing to svn://10.10.2.44/system/prod/machines/backezp-p1/trunk/etc
+N...       dir  acpi
+N...       dir  acpi/actions
+N...       dir  acpi/events
+N...        90  acpi/events/sample.conf
+N...        48  adjtime
+N...      1574  aliases
+N...     12288  aliases.db
+N...       dir  alternatives
+N...        26  alternatives/mta
+  [ ... plein de lignes similaires ... ]
+N...       518  xinetd.d/time-udp
+N...       dir  yum
+N...        19  yum/yum-daily.yum
+N...       671  yum.conf
+N...       dir  yum.repos.d
+committed revision      199 on 2008-11-25T17:19:41.748103Z as farzad.farid
+</pre>
+
+==== Cas du commit dans un référentiel partagé ====
+
+* Pour la '''première machine''' dont on versionne répertoire, il faut appliquer la procédure simple du cas précédent.
+* Pour les '''machines suivantes''', Il faut d'abord ''synchroniser'' le répertoire local avec le réferentiel qui existe déjà, et ensuite seulement faire un ''commit''.
+
+La procédure est la suivante :
+
+# Le répertoire <tt>/app/ezpublish</tt> du serveur de Backoffice CMSINT, '''backezp-p1''', est déjà versionné.
+# Nous voulons versionner le serveur numéro 2, '''backezp-p2'''. Il doit partager le référentiel avec le premier serveur.
+# On exécute les commandes suivantes :
+
+<pre>
+cd /app/ezpublish
+fsvs urls name:base,prio:200,svn://10.10.2.44/cmsint/prod/back/trunk/ezpublish
+fsvs ignore './**~' './**.swp' './**.rpm' './**.rpmsave' './**.rpmnew' './**.orig' './**.old' './**.bak' './**.OLD' './**.diff' './**.patch' './**.tar.gz' './save/**' './extension' './settings' './extension/**' './settings/**' './var/**' './**.nfs*'
+fsvs sync-repos
+</pre>
+
+<br />
+
+{{:Bouygues/Modèle Cadre |
+titre = [[Image:Nuvola_apps_khelpcenter.png|none|22px|Attention]] Attention aux paramètres de la commande ''ignore'' |
+couleur = #FF8000 |
+couleurTitre = #FF0000 |
+contenu = 
+Ici on exclut totalement « <tt>settings</tt> » et « <tt>extension</tt> », car ces deux répertoires sont partagés en NFS, et donc déjà versionnés sur '''backezp-p1'''.
+}}
+
+
+La commande « <tt>sync-repos</tt> » dit à FSVS d'utiliser les informations du référentiel FSVS/SVN existant pour construire la base locale. '''Cette commande ne présente aucun danger car elle ne modifie aucun fichier en local'''.
+
+Il est possible qu'il y ait des différences entre les répertoires des deux serveurs, pour plusieurs raisons :
+# Des fichiers temporaires ont été oubliés sur l'un.
+# Les mêmes fichiers ont été modifiés différemment sur plusieurs machines, par exemple avec un espace en plus dans une ligne.
+# '''Il y a des interaction avec le serveur NFS qui font que FSVS montrent des différences là où il n'y en a pas'''.
+
+
+Maintenant, en utilisant « <tt>fsvs status</tt> », et en lui passant des options adéquates, on peut vérifier s'il y a des corrections à apporter avant le commit final. Par exemple :
+
+<pre>
+[root@backezp-p2 ezpublish]# fsvs status -N
+D...      1113  clearlabels.php
+N...       630  ezpublish.cron
+N...       559  test.php
+..C.       dir  .
+</pre>
+
+Ici on voit que le référentiel contient un fichier qui n'existe pas encore en local (<tt>clearlabels.php</tt>), et que le répertoire local contient deux fichiers en trop (<tt>ezpublish.cron</tt>, <tt>test.php</tt>).
+
+{{:Bouygues/Modèle Cadre |
+titre = [[Image:Nuvola_apps_khelpcenter.png|none|22px|Attention]] Inter |
+couleur = #FF8000 |
+couleurTitre = #FF0000 |
+contenu = 
+Il est possible que « <tt>fsvs status</tt> » plante, à cause de problème NFS, ou à cause de cas limites pas encore pris en compte dans le code de FSVS. Dans ce cas il faudrait utiliser une variante de la commande :
+
+; fsvs status -N : Version non récursive, comme l'exemple ci-dessus.
+; fsvs status mon_répertoire ; Restreint le calcul du status à un répertoire particulier.
+}}
+
+Dans l'exemple ci-dessus, nous devons supprimer <tt>ezpublish.cron</tt> et <tt>test.php</tt> :
+
+<pre>
+fsvs unversion ezpublish.cron test.php
+</pre>
+
+* Dans le cas où il y a des changement à commiter sur '''backezp-p2''', il faut maintenant exécuter la commande suivante :
+
+<pre>
+fsvs commit -o author=farzad.farid -m "Premier commit de backezp-p2:/app/ezpublish"
+</pre>
+
+* Dans certaines cas, la commande ''update'' peut aussi aider à synchroniser les 2 référentiels :
+
+<pre>
+fsvs update
+</pre>
+
+Il faut ensuite vérifier l'état avec « <tt>fsvs status -C</tt> », et éventuellement faire le ''commit''.
+
+=== Cas du référentiel contenant des répertoires en NFS et/ou en lecteur seule ===
+
+{{:Bouygues/Modèle Cadre |
+titre = [[Image:Nuvola_apps_khelpcenter.png|none|22px|Attention]] Si le répertoire contient des répertoire NFS partagés : |
+couleur = #FF8000 |
+couleurTitre = #FF0000 |
+contenu = 
+Dans ce cas de figure, '''il ne faut versionner les sous-répertoires que sur un seul des serveurs, et les ignorer sur les autres'''.
+
+En effet, les modifications sur NFS sont automatiquement répercutées sur tous les serveurs, il est donc inutile (voire dangereux et complexe) de commiter plusieurs fois la même chose.
+}}
+
+Par exemple :
+
+* Soient 2 serveurs frontaux EzPublish, '''frontezp-p1''' et '''frontezp-p2'''.
+* On veut versionner <tt>/app/ezpublish</tt>
+* Le répertoire <tt>/app/ezpublish/settings</tt> est partagé en NFS sur les 2 serveurs
+* Le répertoire <tt>/app/ezpublish/extension</tt> est partagé en NFS sur les 2 serveurs
+
+La solution est :
+
+* Sur '''frontezp-p1''':
+** On met la liste ''ignore'' normale (celle contenant « <tt>./settings/.snapshot ./extension/.snapshot</tt> »). '''Il ne faut pas exclure « ./settings », « ./extension », ni ajouter « DEVICE:0 » dans la ligne ''ignore'' ;
+** On paramètre '''deux''' référentiels comme ci-dessous ;
+** On fait le commit initial normalement, comme décrit au [http://10.42.4.43/wiki/FSVS_Configuration_et_Utilisation#Commit_initial chapitre précédent].
+
+<pre>
+N:nfs,P:100,svn://10.10.2.44/cmsint/prod/front/trunk/ezpublish-extension-settings
+N:base,P:200,svn://10.10.2.44/cmsint/prod/front/trunk/ezpublish
+</pre>
+
+* Sur '''frontezp-p2''' :
+** On rajoute « <tt>./settings</tt> » et « <tt>./extension</tt> » dans la liste ''ignore''
+** On paramètre '''un seul''' référentiel comme ci-dessous,
+** On utilise « <tt>fsvs sync-repos</tt> » pour synchroniser le répertoire avec celui-ci de '''frontezp-p1'''.
+
+<pre>
+N:base,P:200,svn://10.10.2.44/cmsint/prod/front/trunk/ezpublish
+</pre>
+
+
+Ainsi, les répertoire « <tt>./settings</tt> » et « <tt>./extension</tt> » seront versionnés une fois, sur le serveur '''frontezp-p1''', mais resteront invisibles pour FSVS sur le serveur '''frontezp-p2'''.
+
+==== Exemple complet de versionning partagé de /app/ezpublish sur frontezp-p3 ====
+
+'''Pré-requis''' : frontezp-p1 et frontezp-p2 ont déjà été versionnés comme décrit ci-dessus.
+
+<pre>
+fsvs urls N:base,P:200,svn://10.10.2.44/cmsint/prod/front/trunk/ezpublish
+fsvs ignore './**~' './**.swp' './**.rpm' './**.rpmsave' './**.rpmnew' './**.orig' './**.old' './**.bak' './**.OLD' './**.diff' './**.patch' './**.tar.gz' './save/**' './extension' './settings' './var/**' './**.nfs*'
+fsvs sync-repos
+</pre>
+
+Ensuite, on contrôle avec « <tt>fsvs status</tt> » s'il y a des modifications locales à apporter. Eventuellement on fait un commit ensuite.
+
+<pre>
+[root@frontezp-p3 ezpublish]# fsvs status
+</pre>
+<pre>
+D...      6689  kickstart.ini
+.mC.      1154  settings.local/override/site.ini.append.php
+N...      2847  test.php
+..C.       dir  .
+</pre>
+<pre>
+[root@frontezp-p3 ezpublish]# fsvs diff settings.local/override/site.ini.append.php
+</pre>
+<pre>
+diff -u settings.local/override/site.ini.append.php.r236 settings.local/override/site.ini.append.php.local
+--- settings.local/override/site.ini.append.php         Rev. 236        (Mon Feb 18 10:49:37 2008)
++++ settings.local/override/site.ini.append.php         Local version   (Mon Feb 18 10:51:51 2008)
+@@ -1,6 +1,5 @@
+ <?php /* #?ini charset="utf-8"?
+
+-
+ [ExtensionSettings]
+ ActiveExtensions[]
+ ActiveExtensions[]=ezwebin
+</pre>
+<pre>
+[root@frontezp-p3 ezpublish]# fsvs revert kickstart.ini settings.local/override/site.ini.append.php test.php
+</pre>
+<pre>
+Reverting to revision 236:
+D...      6689  kickstart.ini
+.mC.      1155  settings.local/override/site.ini.append.php
+N...         0  test.php
+..C.       dir  /app/ezpublish
+</pre>
+<pre>
+[root@frontezp-p3 ezpublish]# rm -f test.php
+[root@frontezp-p3 ezpublish]# fsvs status
+</pre>
+
+'''Le répertoire « <tt>/app/ezpublish</tt> » de frontezp-p3 est maintenant synchrone avec frontezp-p1/p2 sans que l'on ait eu besoin de faire le moindre ''commit''.'''
+
+== Utilisation de FSVS ==
+
+Cette section décrit l'utilisation quotidienne de FSVS.
+
+Pour l'outil en ligne de commande <tt>fsvs</tt>, référez vous à la [[FSVS_Configuration_et_Utilisation#Documentation|documentation officielle]] pour apprendre le fonctionnement de base.
+
+=== Liste des arborescences spéciales plate-forme par plate-forme ===
+
+Les répertoires "extension" et "settings" dans « <tt>/app/ezpublish</tt> » sont partagés
+en NFS entre plusieurs serveurs. Par contre, ils ne sont présents que '''une seule fois''' dans FSVS.
+
+Voici la liste de tous les emplacements, avec entre parenthèses le nom du serveur
+sur lequel ce référentiel est monté :
+
+* Plate-forme de Préproduction
+** Frontaux
+*** Il n'y a pas de répertoire "ezpublish-extension-settings" pour les frontaux car il est partagé en NFS avec le Backoffice.
+** Backoffice
+*** /cmsint/preprod/back/trunk/ezpublish-extension-settings (''backezp-pp1'')
+* Plate-forme de Production
+** Frontaux
+*** /cmsint/prod/front/trunk/ezpublish-extension-settings (''frontezp-p1'')
+** Backoffice
+*** /cmsint/prod/back/trunk/ezpublish-extension-settings (''backezp-p1'')
+
+'''Note''' : En cas de modification de ce chapitre, il faut aussi mettre à jour le document http://10.10.2.44/viewvc/cmsint/LISEZMOI.
+
+=== Consultation du référentiel ===
+
+L'outil '''[http://viewvc.tigris.org ViewVC]''' fournit une interface web de consultation du référentiel FSVS/Subversion. Grâce à cet outil, il est possible de
+consulter les répertoires CMSINT de tous les serveurs ainsi que l'historique de toutes les modifications.
+
+==== Fonctionnalités fournies ====
+
+* Accès en lecture seule au répertoire applicatif "/app/ezpublish"
+* Accès aux serveurs de Production et Préproduction
+* Possibilité de consulter l'historique des modifications
+* Chaque modification commitée dans le référentiel contient la date et l'auteur de la modification
+* Consultation de l'état d'un dossier ou fichier à une révision (et date) arbitraire dans le passé
+* Possibilité de comparer 2 versions d'un fichier
+* Génération automatique d'archives au format "tar.gz" de répertoires
+
+==== Documentation de ViewVC ====
+
+'''[http://10.10.2.44/viewvc/cmsint/LISEZMOI?view=markup Le mode d'emploi de ViewVC]''' est disponible dans ViewVC lui-même.
+
+'''Note''' : Pour modifier ce document, utilisez la procédure décrite dans la [[FSVS_Installation#Comment_mettre_.C3.A0_jour_la_doc_ViewVC|documentation d'installation de FSVS]].
+
+==== Utilisation ====
+
+'''[http://10.10.2.44/viewvc/ L'interface de consultation ViewVC]''' est sur le serveur '''EzpStatLog'''.
+
+Les mots de passe d'accès sont stocké dans '''Charly''', serveur '''EzpStatLog''', sous le nom d'application '''Apache'''. Chercher « ''FSVS / Subversion'' » dans le champ version pour trouver la bonne entrée.
+
+=== Autocommit : Fonctionnement et consultation ===
+
+==== Fonctionnement ====
+
+Le paquet FSVS créé pour Easynet contient un script « <tt>/usr/sbin/fsvs-autocommit</tt> », ainsi qu'un fichier ''cron'', « <tt>/etc/cron.d/fsvs</tt> », qui en contrôle le lancement quotidien, vers 6 heures du matin.
+
+Ce script fait un commit automatique de tous les changements de la veille, qui n'auraient pas été commités manuellement en journée. Il trouve automatiquement tous les répertoires racines sous contrôle de FSVS (ils sont décrits dans « <tt>/etc/fsvs</tt> »), et génère un journal complet de ses actions.
+
+==== Consultation des logs ====
+
+A la fin de son exécution, <tt>fsvs-autocommit</tt> envoie un message unique à '''syslog''' pour signaler le bon déroulement du script, ou au contraire une erreur. La priorité et le contenu de ce message sont :
+; cron.notice : Aucune erreur ne s'est produite. Le message combien de fichiers/répertoires ont été auto-commités.
+; cron.error : Un erreur s'est produite. Le message dit de consulter le log détaillé.
+
+* '''Php-Syslog-NG''' étant installé sur un serveur central, http://10.10.2.44/php-syslog-ng/html dans le cas de Bouygues Telecom CMSINT, il suffit de consulter cette page chaque jour pour voir l'état du versionning.
+* On peut aussi consulter directement [http://10.10.2.44/php-syslog-ng/html/index.php?table=logs&excludeHost=1&host2=&excludeProgram=0&program2=&program%5b%5d=fsvs&excludeFacility=1&excludePriority=1&date=&time=&date2=&time2=&limit=50&topx=10&orderby=host&order=DESC&msg1=&msg2=&msg3=&pageId=Search le compte-rendu des crons FSVS du matin].
+
+En plus du message syslog, <tt>fsvs-autocommit</tt> écrit un journal complet dans le fichier local « <tt>/var/log/fsvs.log</tt> ». En cas de problème, il faut alors se connecter sur la machine, et de consulter ce fichier.
+
+Voici un exemple d'affichage de Php-Syslog-NG :
+
+[[Image:Php-Syslog-NG-FSVS.png]]
+
+=== Principales commandes FSVS ===
+
+Sauf indication contraire, toutes les commandes qui suivent doivent être exécutées avec un répertoire courant qui est versionné avec FSVS.
+
+==== Affiche le status du répertoire courant ====
+
+<pre>
+# fsvs status -C
+.m..     20215  X11/twm/menudefs.hook
+.m..     23043  X11/twm/system.twmrc
+.m..       dir  X11/twm
+.m..       dir  dhcp3/dhclient-enter-hooks.d
+.m..       dir  pam.d
+.m..        67  resolv.conf
+.mC.     11875  samba/smb.conf
+.m..       dir  samba
+.mC.       642  qt3/qt_plugins_3.3rc
+.m..       dir  qt3
+.mC.       789  vmware/vmnet8/dhcpd/dhcpd.leases
+.m..       dir  vmware/vmnet8/dhcpd
+.m..       dir  fsvs
+.m..       dir  .
+</pre>
+
+* '''Il est conseillé de toujours exécuter <tt>fsvs status</tt> avec l'option <tt>-C</tt>'''
+
+==== Affiche le status en excluant les modifications du répertoire "[/etc/]fsvs" ====
+
+ cd /etc
+ fsvs status | awk '$3 !~ /^fsvs/'
+
+==== Affiche le log de révision pour le répertoire courant ====
+
+ fsvs log [fichier ou répertoire]
+
+En ajoutant l'option '''<tt>-v</tt>''', la commande affiche en plus la liste de tous les fichiers / répertoires concernés par chaque révision.
+
+ fsvs log -v
+
+==== Affiche les objets modifiés par une révision donnée ====
+
+Soit '''N''' le numéro de révision.
+
+ fsvs log -v -r N
+
+==== Committe une arborescence dans un référentiel donné ====
+
+===== Précautions à prendre avec certains référentiels =====
+
+{{:Bouygues/Modèle Cadre |
+titre = Attention aux répertoire gérés par plusieurs référentiels FSVS/SVN à la fois ! |
+couleur = #FF8000 |
+couleurTitre = #FF0000 |
+contenu = 
+Certains répertoires, comme « <tt>/app/ezpublish</tt> », utilisent plusieurs référentiels SVN à la fois. Dans ce cas,
+le '''commit''' devra préciser dans quel référentiel il faut faire la mise à jour.
+}}
+
+Pour vérifier si l'on est dans un répertoire avec un référentiel multiple, taper la commande suivantes. S'il s'affiche une seule URL c'est un référentiel sinon, sinon il est multiple :
+  fsvs urls
+
+Par exemple, sur le serveur '''backezp-p1''' :
+
+<pre>
+[root@backezp-p1 ~]# cd /app/ezpublish
+[root@backezp-p1 ezpublish]# fsvs urls
+N:nfs,P:100,svn://10.10.2.44/cmsint/prod/back/trunk/ezpublish-extension-settings
+N:base,P:200,svn://10.10.2.44/cmsint/prod/back/trunk/ezpublish
+</pre>
+
+Dans ce cas, il faut vérifier, par exemple avec la commande « <tt>fsvs info nom_fichier_ou_repertoire</tt> », l'url à utiliser dans l'option '''commit_to'''. Dans cet exemple :
+* Les répertoires « <tt>/app/ezpublish/extension</tt> » et « <tt>/app/ezpublish/settings</tt> » sont gérés par le référentiel '''nfs'''.
+* Le reste de « <tt>/app/ezpublish</tt> » est géré par le référentiel '''base'''.
+
+Le chapitre consacré aux [[FSVS_Configuration_et_Utilisation#Liste_des_arborescences_sp.C3.A9ciales_plate-forme_par_plate-forme|référentiels spéciaux]] donne plus d'information sur les cas d'usage du multi-référentiel.
+
+===== Exemple de commit =====
+
+ fsvs commit -o commit_to=local -m "Commit des fichiers locaux" hostname network
+
+<pre>
+Committing to file:///usr/src/FSVS/repos/machines/M0379/etc
+N... 14 hostname
+N... dir network
+N... dir network/if-down.d
+N... 32 network/if-down.d/wpasupplicant
+N... dir network/if-post-down.d
+N... 32 network/if-post-down.d/wpasupplicant
+N... 23 network/if-post-down.d/avahi-daemon
+N... 997 network/if-post-down.d/wireless-tools
+N... dir network/if-pre-up.d
+N... 32 network/if-pre-up.d/wpasupplicant
+N... 2280 network/if-pre-up.d/wireless-tools
+N... dir network/if-up.d
+N... 313 network/if-up.d/ntp
+N... 32 network/if-up.d/wpasupplicant
+N... 3726 network/if-up.d/mountnfs
+N... 261 network/if-up.d/avahi-daemon
+N... 462 network/if-up.d/ntpdate
+N... 277 network/interfaces
+N... dir network/run
+N... 16 network/run/ifstate
+committed revision 2 on 2008-10-02T15:54:31.658913Z as root
+</pre>
+
+==== Ignorer un fichier ====
+
+Avec la commande suivante, on ignore :
+* 2 fichiers à la racine du répertoire versionné
+* Tous les fichiers se finissant par '~' dans toute l'arborescence
+* Tous les fichiers et ''devices'' spéciaux (y compris les points de montage)
+
+ fsvs ignore ./.pwd.lock ./mtab './**~' DEVICE:0
+
+Liste des fichiers ignorés :
+
+ fsvs ignore dump -v
+
+Pour plus d'information, consulter http://doc.fsvs-software.org/doxygen-gif/group__ignpat.html
+
+==== Enlever un fichier du référentiel ====
+
+ fsvs unversion ld.so.cache
+
+ d... 82032 ld.so.cache
+
+ fsvs ignore ./ld.so.cache
+ fsvs commit -m "on enlève ld.so.cache du référentiel" ld.so.cache
+
+==== Supprimer un élément de l'ignore list ====
+
+Pour l'instant ce n'est faisable qu'en enlevant et rechargeant toute la liste, sauf l'élément à enlever :
+
+ fsvs ignore dump | grep -v "settings" | fsvs ignore load
+
+==== Réparation du référentiel, resynchronisation ====
+
+ fsvs sync-repos
+
+Résout une désynchronisation entre le référentiel et la copie de travail '''sans modifier aucun fichier en local'''.
+
+==== Trouver à quel référentiel appartient un élément ====
+
+ fsvs info chemin_fichier_ou_repertoire
+
+Regarder le champ '''URL'''.
+
+==== Manipulation de la liste des urls ====
+
+* Affiche le(s) référentiel(s) utilisé(s) :
+
+ fsvs urls dump
+
+ N:local,P:200,svn://10.10.2.44/system/prod/machines/ezpstatlog/trunk/etc
+
+* Modifie le(s) référentiel(s) :
+
+ (echo 'N:local,P:100,svn://10.10.2.44/system/prod/machines/ezpstatlog/trunk/etc') | fsvs urls load
+
+{{:Bouygues/Modèle Cadre |
+titre = [[Image:Nuvola_apps_khelpcenter.png|none|22px|Attention]] Ca casse la base existante car, ça remet le numéro de révision à 0 |
+couleur = #FF8000 |
+couleurTitre = #FF0000 |
+contenu = 
+The problem is that FSVS stores the current revision your WC is at (BASE in subversion-speak) along with the URL. If you dump that URL, and load it (or another) again, FSVS won't know which revision it is at locally - and use rev0. When you're trying to commit, FSVS tells the repository that it has changes against rev0 - but the repository answers "That's out of date! Somebody else committed 200 revisions in the mean time!". To get it working again, you'll have to tell FSVS which revision the WC is at; and the easiest way to do that is to run "<tt>fsvs sync-repos</tt>".
+}}
+

@@ -1,0 +1,398 @@
+{{HowTo}}{{Subversion}}
+{{Bouygues}}
+[[Category:HowTo|Subversion]]
+[[Category:Subversion|Installation]]
+[[Category:Bouygues SAS]]
+[[Category:Bouygues EZP]]
+
+__TOC__
+
+== Description ==
+
+[http://fsvs.tigris.org/ FSVS] est un système de gestion de révision avec des fonctionnalités de sauvegarde/restauration, utilisable sur une arborescence disque ou un système de fichiers entier, et qui utilise [http://subversion.tigris.org/ Subversion] comme serveur de stockage.
+
+FSVS est une sorte de ''tar'' ou ''rsync'' avec une gestion de versions intégrée. Le nom signifie  “''Fast System VerSioning''”et se prononce ''fisvis''.
+
+=== Utilisation de FSVS ===
+
+Ce document décrit la préparation de l'environnement FSVS. Pour un usage quotidien, reportez vous à la [[FSVS_Configuration_et_Utilisation|documentation d'utilisation]].
+
+== Architecture et composants ==
+
+Le système FSVS installé pour Bouygues Telecom est formé des composants suivants :
+
+* L'outil de versionning FSVS, installlé sur les serveurs à versionner
+* Un référentiel de stockage et de versionning unique : Subversion
+* Une interface web de consultation du référentiel Subversion : ViewVC
+* Un batch nocturne, lancé par ''cron'', qui committe automatiquement dans le référentiel toutes les modifications de la journée
+
+== Installation ==
+
+=== Paquetage de FSVS pour RHEL4 ===
+
+FSVS dépend d'une version de Subversion, ainsi que de librairies annexes, qui ne sont pas disponibles dans RHEL4. Il est donc nécessaire de créer un paquet RPM personnalisé.
+
+Les paquets source et binaire de FSVS pour RHEL4 U4 (et U5) sont disponible sur le référentiel Yum de la plate-forme Bouygues Telecom, FTP Rebond (10.10.0.4), dans le répertoire "<tt>/home/yum/RHEL4/U5/custom</tt>". Par exemple :
+
+ -rw-r--r--  1 root staff 3608447 Nov  7 16:48 fsvs-1.1.17-1eas.i386.rpm
+ -rw-r--r--  1 root staff 7933649 Nov  7 16:48 fsvs-1.1.17-1eas.src.rpm
+
+'''Note''' : cette documentation décrit FSVS 1.1.17, il se peut que la version disponible soit plus récente.
+
+Le paquet FSVS Easynet contient 2 fichiers qui ne sont pas dans la distribution classique, il s'agit de la configuration cron et du script cron qui gèrent l'auto-commit :
+* /etc/cron.d/fsvs
+* /usr/sbin/fsvs-autocommit
+
+Il contient également sa propre copie de librairies installées dans un répertoire dédié pour ne pas polluer le système :
+* /opt/fsvs/lib
+
+
+
+==== Recompilation du paquet Easynet existant ====
+
+Pour recompiler le paquet existant, il faut utiliser une machine RHEL4 U4 ou U5 avec un environnement de développement installé. Il faut notamment les paquets suivants :
+
+* make
+* gcc4 ('''GCC 3.4.6 ne compile pas FSVS correctement''')
+* gdbm-devel
+* pcre-devel
+* ctags
+
+'''Si des librairies de développements Subversion, Apache ou APR sont installées en version RHEL4, il faut les désinstaller''' :
+
+ rpm -e subversion-devel apr-devel apr-util-devel httpd-devel
+
+Installer ensuite le paquet source rpm :
+
+ rpm -Uvh fsvs-1.1.17-1eas.src.rpm
+
+Lancer la compilation :
+
+ cd /usr/src/redhat
+ rpmbuild -bb SPECS/fsvs.spec
+
+Le paquet binaire sera dans "<tt>RPSM/i386</tt>".
+
+S'il faut aussi regénérer un nouveau paquet source, remplacer "<tt>-bb</tt>" par "<tt>-ba</tt>".
+
+Installer ensuite les paquets RPM dans le référentiel YUM "custom".
+
+==== Spécificité de la compilation pour l'environnement Easynet / Bouygues Telecom ====
+
+On compile un paquet Subversion localement afin d'avoir les bonnes librairies de dépendance pour FSVS. L'équivalent des lignes suivantes est fait par le fichier SPEC :
+
+ cd subversion-1.5.x
+ ./configure --prefix=/opt/fsvs
+ make
+ make install
+
+Ensuite, FSVS lui-même est compilé de la façon suivante, pour utiliser les librairies installées dans "<tt>/opt/fsvs/lib</tt>" :
+ export RPATH=/opt/fsvs/lib
+ export CFLAGS="-I/usr/include/pcre"
+ ./configure -with-aprinc=/opt/fsvs/include/apr-1 --with-svninc=/opt/fsvs/include --with-aprlib=/opt/fsvs/lib --with-svnlib=/opt/fsvs/lib
+ cd src
+ make
+
+==== Compilation d'un paquet FSVS différent ====
+
+Pour changer par exemple de version de FSVS, procéder comme ceci :
+
+* Installer la versions Source RPM actuelle, de façon à avoir le fichier "<tt>/usr/src/redhat/SPECS/fsvs.spec</tt>"
+* Télécharger la dernière version de FSVS sur le site officile (voir les références)
+* Poser le fichier source dans "<tt>/usr/src/redhat/SOURCES</tt>"
+* Téléchager les source Subversion ainsi que le fichier contenant les sources des dépendances dans le même répertoire. Pour FSVS 1.1.17, les paquets suivants ont été utilisés :
+ wget http://subversion.tigris.org/downloads/subversion-1.5.2.tar.bz2
+ wget http://subversion.tigris.org/downloads/subversion-deps-1.5.2.tar.bz2
+* Corriger le fichier "<tt>fsvs.spec</tt>", notamment si les numéros de version de FSVS ou Subversion ont changé.
+** Mettre à jour le changelog
+** Mettre à jour le numéro de révision du paquet
+* Recompiler comme précédemment, en utilisant l'option "-ba" de <tt>rpmbuilb''</tt>, pour créer également le nouveau paquet source.
+
+==== Sections importantes de fsvs.spec ====
+
+Voici les parties du fichier "<tt>fsvs.spec</tt>" qui seront le plus souvent modifiées :
+
+ Version:        1.1.17
+ Release:        1eas
+ ...
+ %define svn_version     1.5.2
+ %define source1         subversion-%{svn_version}.tar.bz2
+ %define source2         subversion-deps-%{svn_version}.tar.bz2
+ ...
+ changelog
+ * Wed Oct 29 2008 Farzad FARID <ffarid@pragmatic-source.com> 1.1.17-1eas
+ - Upgrade to 1.1.17
+ - Change FSVS's source URL
+
+
+
+==== Arborescence du paquet FSVS ====
+
+Le paquet FSVS Easynet utilise l'arborescence suivante :
+
+; /usr/bin/fsvs : Le binaire
+; /etc/cron.d/fsvs : Le cron d'auto-commit, spécifique Easynet
+; /usr/sbin/fsvs-autocommit : Le script d'auto-commit, spécifique Easynet
+; /opt/fsvs/lib : Les librairies dont FSVS dépend et qui ne sont pas disponibles dans RHEL4
+; /usr/share/doc, /usr/share/man : Documentation
+; /var/spool/fsvs : Spool utilisé par FSVS pour le stockage local de l'état des arborescences
+
+=== Installation de Subversion ===
+
+Il y a un seul référentiel Subversion, qui centralise les sauvegardes de tous les serveurs. Pour la plate-forme Bouygues Telecom CMSINT, il s'agit de ''EzpStatLog'' (10.10.2.44).
+
+Vous pouvez consulter aussi la page [[How_To_Subversion_Installation]] pour des informations sur l'installation de Subversion chez Easynet.
+
+Le référentiel sera installé dans le répertoire "<tt>/app/fsvs</tt>".
+
+'''Attention : La version de Subversion fournie sur RHEL4 est trop ancienne (1.1), il faut installer un paquet Subversion 1.4 minimum pour pouvoir utiliser FSVS'''.
+
+* Sur le référentiel Yum (ici 10.10.0.4), dans la section "custom", installer une version récente de Subversion, compilée pour RHEL4. Par exemple celle fournie par Dag Wieers (http://dag.wieers.com/rpm/packages/subversion/) :
+** Ajout de http://dag.wieers.com/rpm/packages/subversion/subversion-1.4.6-0.1.el4.rf.i386.rpm et http://dag.wieers.com/rpm/packages/subversion/subversion-devel-1.4.6-0.1.el4.rf.i386.rpm dans le référentiel "RHEL4 U5 custom" de 10.10.0.4
+* Si nécessaire, modifier "<tt>/etc/yum.conf</tt>" sur le futur serveur Subversion pour y ajouter la section suivante :
+ [custom]
+ name=repository custom Easynet
+ baseurl=http://10.10.0.4:10002/RHEL4/U5/custom
+* Installer le paquet :
+ yum install subversion
+* Créer et configurer le référentiel Subversion :
+ svnadmin create --fs-type fsfs /app/fsvs
+ chgrp -R apache /app/fsvs
+ chmod -R g+rXs /app/fsvs
+
+== Configuration client et serveur ==
+
+=== Configuration du service réseau Subversion ===
+
+Nous utilisons '''svnserve''', qui est moins puissant que '''mod_dav_svn''', le serveur WebDAV de Subversion, mais qui a les avantages suivants :
+* Plus simple à configurer
+* mod_dav_svn doit être en version 1.4, et nécessite une version de Apache qui n'est pas disponible dans RHEL4.
+
+==== Fichier /app/fsvs/config/svnserve.conf ====
+
+Mettre les lignes suivantes dans ce fichier :
+
+ [general] 
+ anon-access = none 
+ auth-access = write 
+ password-db = passwd 
+ realm = Referentiel de configuration Bouygues Telecom
+
+==== Fichier /app/fsvs/config/passwd ====
+
+Mettre les couples login / mot de passe dans ce fichier, en utilisant la convention Easynet : ''prénom.nom''. Le login ''easynet'' est utilisé par le script d'auto-commit.
+
+ # Mots de passe d'acces a subversion 
+ [users] 
+ easynet = xxxxxx
+ gilles.leprince = xxxx
+ ....
+
+==== Démarrage de svnserve ====
+
+Svnserver est lancé par ''xinetd''. Mettre les lignes suivantes dans le fichier "<tt>/etc/xinetd.d/svnserve</tt>" :
+
+ # description: Lancement du serveur svnserve pour Subversion/FSVS 
+ # avec contrôle d'accès 
+ service svn 
+ { 
+   disable = no 
+   socket_type = stream 
+   wait = no 
+   user = root 
+   group = apache 
+   server = /usr/bin/svnserve 
+   server_args = --inetd --root=/app/fsvs 
+   log_on_failure += USERID 
+   only_from = 10.10.0.0/16 
+ }
+
+Puis recharger la configuration :
+
+ /etc/init.d/xinetd reload
+
+=== Installation et configuration de ViewVC ===
+
+Voici la procédure d'installatin de ViewVC sur le serveur EZPStatLog.
+
+ViewVC est disponible sur le site http://viewvc.tigris.org. C'est la version '''1.0.7''' qui a été utilisée pour l'installation initiale. ViewVC dépend de Subversion 1.2 au minimum, comme vu précédemment nous utilisons la version 1.4 de Dag Wieers, il n'y a donc pas de problème à ce niveau.
+
+* Il faut d'abord installer « enscript » qui est une dépendance de ViewVC :
+
+ yum install enscript
+
+* Ensuite on décompacte les sources de ViewVC dans « <tt>/usr/src</tt> »
+* Depuis le répertoire source, lancer la commande « <tt>./viewvc-install</tt> » et répondre aux questions
+** ''Installation path'' : <tt>/app/viewvc-1.0.7</tt>
+** ''DESTDIT'' : Laisser ce champ vide
+* On configure ensuite le modèle graphique du site (''template'').
+
+<pre>
+cd /app/viewvc-1.0.7
+cp -a templates templates-easynet
+</pre>
+
+Modifier <tt>templates-easynet/include/header.ezt</tt> et <tt>templates-easynet/docroot/styles.css</tt>.
+
+<pre>
+diff -urN templates/docroot/styles.css templates-easynet/docroot/styles.css
+--- templates/docroot/styles.css        2008-10-21 16:45:59.000000000 +0200
++++ templates-easynet/docroot/styles.css        2008-11-17 11:55:01.000000000 +0100
+@@ -6,8 +6,12 @@                                                                   
+ html, body {                                                                      
+   color: #000000;                                                                 
+   background-color: #ffffff;                                                      
++  font-family: arial,helvetica,sans-serif;                                        
++  font-size: 12px;                                                                
+ }                                                                                 
+                                                                                   
++a         { text-decoration:none;}                                                
++a:hover   { text-decoration:underline;}                                           
+ a:link    { color: #0000ff; }                                                     
+ a:visited { color: #880088; }                                                     
+ a:active  { color: #0000ff; }                                                     
+@@ -24,11 +28,22 @@
+ tr, td, th { vertical-align: top; }
+ form { margin: 0; }
+
++h1{
++  font-size: 24px;
++  text-align: center;
++  color: #000066
++}
++
+ /** Navigation Headers ***/
+ .vc_navheader {
+   background-color: #cccccc;
+ }
+
++.vc_title {
++  background-color: #87CEEB;
++  padding: 2px;
++}
++
+
+ /*** Table Headers ***/
+ .vc_header {
+diff -urN templates/include/header.ezt templates-easynet/include/header.ezt
+--- templates/include/header.ezt        2008-10-21 16:45:59.000000000 +0200
++++ templates-easynet/include/header.ezt        2008-11-17 11:51:55.000000000 +0100
+@@ -9,6 +9,10 @@
+   [if-any rss_href]<link rel="alternate" type="application/rss+xml" title="RSS [[][rootname]][where]" href="[rss_href]" />[end]
+ </head>
+ <body>
++<div class="vc_title">
++  <h1>Référentiel Bouygues Telecom CMSINT</h1>
++  <p>Consultez la <a href="/viewvc/cmsint/LISEZMOI?view=markup">documentation FSVS</a> pour plus d'information sur l'utilisation de ce référentiel.</p>
++</div>
+ <div class="vc_navheader">
+ [if-any roots]
+   <form method="get" action="[change_root_action]">
+</pre>
+
+* Editer ensuite le fichier <tt>/app/viewvc-1.0.7/viewvc.conf</tt> pour faire des modifications. Commenter d'abord  <tt>cvs_roots</tt> puis modifier les lignes suivantes :
+
+<pre>
+svn_roots = svn: /app/fsvs 
+default_root = svn 
+mime_types_file = /etc/mime.types 
+address = <a href="mailto:bouygues-tech@fr.easynet.net">bouygues-tech@fr.easynet.net</a> 
+languages = fr, en-us 
+allow_tar = 1 
+use_localtime = 1 
+use_enscript = 1 
+template_dir = templates-easynet 
+</pre>
+
+* Editer le fichier <tt>/etc/httpd/conf/httpd.conf</tt> :
+
+<pre>
+# Configuration de ViewCV (navigateur Subversion, pour FSVS) 
+ScriptAlias /viewvc /app/viewvc-1.0.7/bin/cgi/viewvc.cgi 
+ScriptAlias /query /app/viewvc-1.0.7/bin/cgi/query.cgi 
+
+<Location /viewvc/system> 
+Order deny,allow 
+Deny from all 
+Allow from 10.0.0.0/16 
+
+AuthUserFile /etc/httpd/conf/cmsint_viewvc.passwd 
+AuthType Basic 
+AuthName "Acces au referentiel CMSINT" 
+
+Require user easynet 
+</Location> 
+
+<Location /viewvc/cmsint> 
+Order deny,allow 
+Allow from all 
+
+AuthUserFile /etc/httpd/conf/cmsint_viewvc.passwd 
+AuthType Basic 
+AuthName "Acces au referentiel CMSINT" 
+Require user easynet bouygtel 
+</Location>
+</pre>
+
+* Créer un fichier de mots de passe pour protéger le site, avec les commandes suivantes :
+
+<pre>
+cd /etc/httpd/conf
+htpasswd -c -m cmsint_viewvc.passwd easynet
+htpasswd -m cmsint_viewvc.passwd bouygtel
+</pre>
+
+* Redémarrer Apache, ViewVC est maintenant prêt à l'emploi.
+
+=== Configuration machines clientes ===
+
+Ce document ne pas la configuration de FSVS lui-même, juste des outils connexes. Voir [[FSVS_Configuration_et_Utilisation]] pour avoir la documentation sur l'utilisation de FSVS.
+
+==== Configuration de l'auto-commit ====
+
+Le script "<tt>fsvs-autocommit</tt>" écrit un message d'info ou d'erreur en '''syslog''' lors de son exécution.
+
+Le script est lancé par '''cron''', à 6h13 du matin. Ceci est paramétrable dans "<tt>/etc/cron.d/fsvs</tt>".
+
+==== Configuration syslog ====
+
+Pour que les logs de l'auto-commit soient faciles à exploiter, tous les serveurs doivent rediriger ''syslog'' vers un serveur PHP Syslog NG central.
+
+La configuration du client syslog et du serveur syslog-ng centralisateur n'est pas décrite dans ce document.
+
+== Divers ==
+
+=== Comment mettre à jour la doc ViewVC ===
+
+La [http://10.10.2.44/viewvc/cmsint/LISEZMOI?view=markup documentation de ViewVC] est stockée dans le référentiel lui-même, à la racine de « <tt>/cmsint></tt> ». Pour modifier cette documentation, il faut utiliser l'outil ''svn'' et appliquer la procédure suivante:
+
+* Se connecter sur EzpStatLog
+* Aller dans un répertoire temporaire et faire une extraction ''non récursive'' du répertoire <tt>/cmsint</tt> du référentiel :
+
+<HighLightSyntax language=bash>
+cd /tmp
+svn checkout --non-recursive svn://10.10.2.44/cmsint viewvc-doc
+</HighlightSyntax>
+
+* Editer le fichier <tt>LISEZMOI</tt>
+
+<HighLightSyntax language=bash>
+cd viewvc-doc
+vim LISEZMOI
+</HighlightSyntax>
+
+* Commiter le fichier modifié :
+
+<HighLightSyntax language=bash>
+svn commit --username=farzad.farid -m "Ajout de XXXXX dans la doc ViewVC" LISEZMOI
+cd ..
+rm -rf /tmp/viewvc-doc
+</HighlightSyntax>
+
+== Références ==
+
+* FSVS : http://fsvs.tigris.org/
+** Site de documentation : http://doc.fsvs-software.org/
+* Subversion : http://subversion.tigris.org/
+* ViewVC : http://viewvc.tigris.org/
+
