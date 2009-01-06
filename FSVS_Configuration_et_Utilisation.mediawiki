@@ -203,6 +203,19 @@ sur lequel ce référentiel est monté :
 
 '''Pour cette raison, en cas de mise à jour de CMSINT, il ne faut exécuter FSVS que sur les machines backezp-pp1, frontezp-p1 et backezp-p1. Si la mise à jour ne touche à aucun fichier en dehors des répertoires « extension x et « settings », il ne faut pas lancer FSVS sur backezp-p2, frontezp-p2, frontezp-p3, backezp-pp2, etc.'''
 
+Pour commiter dans les répertoires "settings" et "extension" de Préproduction, il faut donc ajouter l'argument « '''<code>-o commit_to=nfs</code>''' » à la ligne de commande. Par exemple :
+
+<pre>
+# fsvs commit -o commit_to=nfs -m "Application de la NT-SIC-TRV-CMSINT-000047-2 : Gestion du cache par siteaccess"
+Committing to svn://10.10.3.24/cmsint/preprod/back/trunk/ezpublish-extension-settings
+.mC.      1744  admin/site.ini.append.php
+.mC.       980  cmsint/site.ini.append.php
+.mC.      2265  ecf2/site.ini.append.php
+.mC.      1636  site_instit/site.ini.append.php
+.mC.      1175  ecf/site.ini.append.php
+committed revision      282 on 2009-01-05T17:23:52.098497Z as easynet
+</pre>
+
 '''Note''' : En cas de modification de ce chapitre, il faut aussi mettre à jour le document http://10.10.2.44/viewvc/cmsint/LISEZMOI.
 
 === Consultation du référentiel ===
@@ -254,6 +267,191 @@ En plus du message syslog, <tt>fsvs-autocommit</tt> écrit un journal complet da
 Voici un exemple d'affichage de Php-Syslog-NG :
 
 [[Image:Php-Syslog-NG-FSVS.png]]
+
+=== Exemple complet d'utilisation de FSVS en production ===
+
+==== Application d'un patch importe sur EzPublish ====
+
+A cause d'un bug cause par la version de Flash 10 sur EzPublish, http://issues.ez.no/13783
+, il est nécessaire d'appliquer un patch au code PHP et au settings.
+
+Le patch va être appliqué en Préprod, sur tous les FO et BO.
+
+'''Attention aux points suivants''' :
+* On ne va appliquer le patch qu'au FO 1 et au BO 1, on utilisera ensuite FSVS pour répliquer la modification sur les autres serveurs.
+* Etant donné que le patch à appliquer touche au répertoire « <code>settings</code> », et que celui-ci est monté en ''lecture seule'' sur les FO, il est nécessaire d'appliquer d'abord le patch sur les BO.
+* Pour cette même raison, l'application du patch sur les FO échouera partiellement car le répertoire « <code>settings</code> » n'est pas inscriptible. On pourra ignorer cette erreur.
+
+===== Sur backezp-pp1 =====
+
+* Le patch est copié dans /tmp.
+
+ cd /app/ezpublish
+
+* On vérifie quels sont les référentiels FSVS : Il faudra penser à faire les ''commit'' dans les bons référentiels !
+<pre>
+# fsvs urls
+N:nfs,P:100,svn://10.10.3.24/cmsint/preprod/back/trunk/ezpublish-extension-settings
+N:base,P:200,svn://10.10.3.24/cmsint/preprod/back/trunk/ezpublish
+</pre>
+
+* On vérifie que le patch s'appliquerait bien :
+<pre>
+# patch -p0 --dry-run < /tmp/issue13783_39stable_ported_rev22512.diff
+(Stripping trailing CRs from patch.)
+patching file kernel/classes/binaryhandlers/ezfilepasstrough/ezfilepasstroughhandler.php
+Hunk #1 succeeded at 85 (offset -2 lines).
+(Stripping trailing CRs from patch.)
+patching file settings/file.ini
+</pre>
+
+* OK, on applique le patch :
+
+<pre>
+# patch -p0 < /tmp/issue13783_39stable_ported_rev22512.diff
+(Stripping trailing CRs from patch.)
+patching file kernel/classes/binaryhandlers/ezfilepasstrough/ezfilepasstroughhandler.php
+Hunk #1 succeeded at 85 (offset -2 lines).
+(Stripping trailing CRs from patch.)
+patching file settings/file.ini
+</pre>
+
+* Contrôle FSVS :
+<pre>
+# fsvs status
+.mC.      2205  settings/file.ini
+.mC.      5054  kernel/classes/binaryhandlers/ezfilepasstrough/ezfilepasstroughhandler.php
+</pre>
+
+* '''C'est ici qu'il faut faire attention''' : On committe le fichier ''ini'' dans le référentiel '''nfs''' et le fichier ''php'' dans le référentiel '''base''' :
+
+<pre>
+# fsvs commit -m "Application d'un patch pour le bug http://issues.ez.no/13783" -o commit_to=nfs -o author=farzad.farid settings/file.ini
+Committing to svn://10.10.3.24/cmsint/preprod/back/trunk/ezpublish-extension-settings
+.mC.      1990  settings/file.ini
+committed revision      283 on 2009-01-06T09:51:29.785749Z as easynet
+
+# fsvs commit -m "Application d'un patch pour le bug http://issues.ez.no/13783" -o commit_to=base -o author=farzad.farid kernel/classes/binaryhandlers/ezfilepasstrough/ezfilepasstroughhandler.php
+Committing to svn://10.10.3.24/cmsint/preprod/back/trunk/ezpublish
+.mC.      4342  kernel/classes/binaryhandlers/ezfilepasstrough/ezfilepasstroughhandler.php
+committed revision      284 on 2009-01-06T09:51:39.538928Z as easynet
+</pre>
+
+C'est terminé pour backezp-pp1.
+
+===== Sur backezp-pp2 =====
+
+Ici on va synchroniser les changement qui sont déjà dans FSVS.
+
+* On va dans le répertoire applicatif
+
+<pre>
+# cd /app/ezpublish
+</pre>
+
+* On contrôle ce que FSVS ferait comme changement, sans l'appliquer encore. '''Note''' : Le fichier « <code>settings/file.ini</code> » n'apparaît pas ici car le référentiel FSVS appelé '''nfs''' n'est pas configuré sur ''backezup-pp2''.
+<pre>
+# fsvs remote-status
+.mC.      4342  kernel/classes/binaryhandlers/ezfilepasstrough/ezfilepasstroughhandler.php
+Remote-status against revision  284.
+</pre>
+
+* On applique maintenant le patch
+<pre>
+# fsvs update
+Updating svn://10.10.3.24/cmsint/preprod/back/trunk/ezpublish to revision       284.
+.mC.      5054  kernel/classes/binaryhandlers/ezfilepasstrough/ezfilepasstroughhandler.php
+.m..       dir  kernel/classes/binaryhandlers/ezfilepasstrough
+</pre>
+
+C'est terminé pour backezp-pp2.
+
+===== Sur frontezp-pp1 =====
+
+* Le patch est copié dans /tmp.
+
+ cd /app/ezpublish
+
+* On vérifie quels sont les référentiels FSVS : Ici, contrairement à '''backezp-pp1''', il n'y a qu'un seul référentiel, car les répertoires <code>settings</code> et <code>extension</code> sont partagé (et géré via FSVS) sur backezp-pp1 :
+<pre>
+# fsvs urls
+N:base,P:200,svn://10.10.3.24/cmsint/preprod/front/trunk/ezpublish
+</pre>
+
+* On vérifie que le patch s'appliquerait bien :
+<pre>
+[root@frontezp-pp1 ezpublish]# patch -p0 --dry-run < /tmp/issue13783_39stable_ported_rev22512.diff
+(Stripping trailing CRs from patch.)
+patching file kernel/classes/binaryhandlers/ezfilepasstrough/ezfilepasstroughhandler.php
+Hunk #1 succeeded at 85 (offset -2 lines).
+(Stripping trailing CRs from patch.)
+patching file settings/file.ini
+Reversed (or previously applied) patch detected!  Assume -R? [n] n
+Apply anyway? [n] n
+Skipping patch.
+1 out of 1 hunk ignored -- saving rejects to file settings/file.ini.rej
+</pre>
+
+* Notez qu'on a une erreur sur le patch pour <code>file.ini</code>, car le fichier, qui est partagé en NFS, a déjà été patché sur backezp-pp1. On va ignorer cette erreur en répondant 2 fois "'''n'''" à la commande <code>patch</code>.
+
+* Maintenant, on applique le patch, en ignorant les erreurs :
+
+<pre>
+# patch -p0  < /tmp/issue13783_39stable_ported_rev22512.diff
+(Stripping trailing CRs from patch.)
+patching file kernel/classes/binaryhandlers/ezfilepasstrough/ezfilepasstroughhandler.php
+Hunk #1 succeeded at 85 (offset -2 lines).
+(Stripping trailing CRs from patch.)
+patching file settings/file.ini
+Reversed (or previously applied) patch detected!  Assume -R? [n] n
+Apply anyway? [n] n
+Skipping patch.
+1 out of 1 hunk ignored -- saving rejects to file settings/file.ini.rejpatch: **** Can't create file settings/file.ini.rej : Read-only file system
+</pre>
+
+* Contrôle FSVS :
+<pre>
+# fsvs status
+.mC.      5054  kernel/classes/binaryhandlers/ezfilepasstrough/ezfilepasstroughhandler.php
+</pre>
+
+* On committe le fichier modifié dans le référentiel '''base'''. Comme c'est le seul référentiel FSVS, on n'a pas besoin de donner l'option « <code>-o commit_to=..</code> »
+
+<pre>
+# fsvs commit -m "Application d'un patch pour le bug http://issues.ez.no/13783"
+Committing to svn://10.10.3.24/cmsint/preprod/front/trunk/ezpublish
+.mC.      4342  kernel/classes/binaryhandlers/ezfilepasstrough/ezfilepasstroughhandler.php
+committed revision      285 on 2009-01-06T10:08:41.580957Z as easynet
+</pre>
+
+C'est terminé pour frontezp-pp1.
+
+===== Sur frontezp-pp2 =====
+
+Ici on va synchroniser les changement qui sont déjà dans FSVS.
+
+* On va dans le répertoire applicatif
+
+<pre>
+# cd /app/ezpublish
+</pre>
+
+* On contrôle ce que FSVS ferait comme changement, sans l'appliquer encore. '''Note''' : Le fichier « <code>settings/file.ini</code> » n'apparaît pas ici car le référentiel FSVS appelé '''nfs''' n'est pas configuré sur les frontaux.
+<pre>
+# fsvs remote-status
+.mC.      4342  kernel/classes/binaryhandlers/ezfilepasstrough/ezfilepasstroughhandler.php
+Remote-status against revision  285.
+</pre>
+
+* On applique maintenant le patch
+<pre>
+# fsvs update
+Updating svn://10.10.3.24/cmsint/preprod/front/trunk/ezpublish to revision      285.
+.mC.      5054  kernel/classes/binaryhandlers/ezfilepasstrough/ezfilepasstroughhandler.php
+.m..       dir  kernel/classes/binaryhandlers/ezfilepasstrough
+</pre>
+
+C'est terminé pour frontezp-pp2.
 
 === Principales commandes FSVS ===
 
@@ -411,6 +609,33 @@ Résout une désynchronisation entre le référentiel et la copie de travail '''
 
 Regarder le champ '''URL'''.
 
+==== Comparer des fichiers directement dans le référentiel Subversion ====
+
+Supposons que je veuille contrôler le fichier « <code>/etc/httpd/conf/httpd.conf</code> » sur les 4 frontaux pour vérifier la présence de 2 lignes.
+
+* Je me connecte sur '''frontezp-p1''' et je vérifié cette machine ci. 
+* Ensuite, pour ne pas avoir à refaire une vérification manuelle sur les 3 autres machines, qui est fastidieux et source d’erreur, je fait l’opération suivante.
+* Connexion SSH sur '''EzpStatLog''', qui est le serveur FSVS/ Subversion. 
+* Recherche de l’url Subversion correspondant à « <code>frontezp-p1:/etc/httpd/conf</code> » . Cela peut se faire en parcourant le référentiel à la main, ou bien en s’aidant de l’interface web '''ViewVC'''.
+* Sachant que la racine du référentiel est « <code>/app/fsvs</code> » sur EzpStatLog, il faut taper les commandes suivantes. 
+
+<pre>
+svn ls –v file:///app/fsvs/system 
+svn ls –v file:///app/fsvs/system/prod
+… (ainsi de suite jusqu’à la bonne arborescence)
+svn ls -v file:///app/fsvs/system/prod/machines/frontezp-p1/trunk/etc/httpd/conf/httpd.conf
+</pre>
+
+* Et maintenant, pour comparer ce fichier httpd.conf aux versions des machines 2, 3 et 4, il suffit de taper : 
+
+<pre>
+svn diff file:///app/fsvs/system/prod/machines/frontezp-p1/trunk/etc/httpd/conf/httpd.conf file:///app/fsvs/system/prod/machines/frontezp-p2/trunk/etc/httpd/conf/httpd.conf
+svn diff file:///app/fsvs/system/prod/machines/frontezp-p1/trunk/etc/httpd/conf/httpd.conf file:///app/fsvs/system/prod/machines/frontezp-p3/trunk/etc/httpd/conf/httpd.conf
+svn diff file:///app/fsvs/system/prod/machines/frontezp-p1/trunk/etc/httpd/conf/httpd.conf file:///app/fsvs/system/prod/machines/frontezp-p4/trunk/etc/httpd/conf/httpd.conf
+</pre>
+
+J'ai aussi pu comparer les 4 fichiers des 4 machines sans me connecter en SSH partout.
+
 ==== Manipulation de la liste des urls ====
 
 * Affiche le(s) référentiel(s) utilisé(s) :
@@ -430,4 +655,3 @@ couleurTitre = #FF0000 |
 contenu = 
 The problem is that FSVS stores the current revision your WC is at (BASE in subversion-speak) along with the URL. If you dump that URL, and load it (or another) again, FSVS won't know which revision it is at locally - and use rev0. When you're trying to commit, FSVS tells the repository that it has changes against rev0 - but the repository answers "That's out of date! Somebody else committed 200 revisions in the mean time!". To get it working again, you'll have to tell FSVS which revision the WC is at; and the easiest way to do that is to run "<tt>fsvs sync-repos</tt>".
 }}
-
