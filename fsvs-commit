@@ -1,0 +1,109 @@
+#!/bin/bash
+
+# fsvs-commit : Aide au commit avec un référentiel multi-url
+#
+# Auteur  : Farzad FARID <ffarid@pragmatic-source.com>
+# Date    : 26/01/2008
+# Version : 1
+#
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# USAGE :
+#
+# Ce script sert de proxy à "fsvs commit" et se charge de vérifier sur quelle
+# url chaque élément passé en paramètre doit être commité.
+
+#--------------------------------
+# CONFIGURATION
+#--------------------------------
+LOGFILE=/var/log/fsvs.log
+FSVS_CONFIG=/etc/fsvs/config
+
+#---------------------------------
+# Fonctions
+#---------------------------------
+usage() {
+	cat <<-EOS 1>&2
+Usage: $0 -u username -m "Commit message" [options] files...
+
+Options :
+    -h : Affiche cete aide
+    -u username : Nom d'utilisateur sous la forme "prenom.nom"
+    -m "message.." : Message de commit
+    Autres options : les autres options sont passées à "fsvs commit"
+
+ Ce script sert de proxy à "fsvs commit" et se charge de vérifier sur quelle
+ url chaque élément passé en paramètre doit être commité.
+EOS
+}
+
+
+
+#---------------------------------
+# Programme principal
+#---------------------------------
+
+# Déjà, est-ce qu'il y a FSVS ainsi qu'un répertoire de configuration ?
+if [ ! -x /usr/bin/fsvs -o ! -d /etc/fsvs ]; then
+	echo "ERREUR : FSVS n'est pas configuré sur ce serveur"
+	exit 1
+fi
+
+# Paramètres de la ligne de commande
+USERNAME=
+MESSAGE=
+OTHER_OPTIONS=
+while getopts 'hu:m:' OPTION; do
+	case $OPTION in
+	u)
+		USERNAME=$OPTARG
+		;;
+	m)
+		MESSAGE=$OPTARG
+		;;
+	h)
+		usage
+		exit 0
+		;;
+	?)
+		echo "ERREUR: Option '$OPTARG' invalide"
+		usage
+		exit 1
+		;;
+	esac
+done
+
+# Les paramètres sont obligatoires
+if [ -z "$USERNAME" -o -z "$MESSAGE" ]; then
+	echo "ERREUR: les paramètres -u et -m sont obligatoires"
+	usage
+	exit 1
+fi
+
+# Supprime les paramètres déjà lus
+shift $(($OPTIND - 1))
+
+# Fichiers à commiter
+declare -a files
+# Les guillemets permettent de conserver les espaces passés en paramètres,
+# par exemple : fichier1 fichier2 "fichier3 avec des espaces"
+files=("$@")
+
+echo "USERNAME=$USERNAME"
+echo "MESSAGE=$MESSAGE"
+echo "Il y a ${#files[@]} fichier(s) : files=${files[@]}"
+echo ${files[0]}
+echo ${files[1]}
+
+exit 0
