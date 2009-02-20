@@ -15,7 +15,7 @@ License:        GPLv3
 # dépendances.
 
 # !!!!!!!!!!!!!!!! ATTENTION !!!!!!!!!!!!!!!!!!!
-# A la compilation, le rpmbuild va crée et remplir le
+# A la compilation, le rpmbuild va créer et remplir le
 # répertoire /opt/fsvs. J'ait fait ainsi pour simplifier
 # le processus de compilation, qui n'est déjà pas simple.
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
